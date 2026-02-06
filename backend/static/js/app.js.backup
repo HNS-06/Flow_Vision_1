@@ -1,0 +1,528 @@
+/**
+ * FlowVision - Smart Water Network Dashboard
+ * Supports 4 Wards x 4 Pipes Topology
+ */
+
+// State
+let ws = null;
+let currentWard = 1;
+let selectedView = 'dashboard';
+let simulationActive = false;
+let charts = {};
+
+// DOM Elements
+const elements = {
+    wardSelect: document.getElementById('ward-select'), // Needs to be added to HTML
+    metrics: {
+        flow: document.getElementById('metric-flow'),
+        pressure: document.getElementById('metric-pressure'),
+        status: document.getElementById('system-status'),
+        activePipe: document.getElementById('active-pipe-display')
+    },
+    pipesContainer: document.getElementById('pipes-container'), // New container for Smart Grid
+    alertsList: document.getElementById('alerts-list')
+};
+
+// Initialize
+async function initApp() {
+    console.log("FlowVision Smart Grid Initializing...");
+
+    // Check Auth (Simple Demo)
+    if (!document.cookie.includes('auth=true') && window.location.pathname !== '/static/login.html') {
+        // In a real app we'd redirect, for demo we just assume logged in or let them stay
+    }
+
+    // Setup Ward Selector (Dynamic creation if not exists)
+    setupWardSelector();
+
+    // Initialize ALL Charts
+    if (document.getElementById('flowChart')) {
+        charts.flow = initFlowChart(document.getElementById('flowChart').getContext('2d'));
+    }
+
+    if (document.getElementById('anomalyChart')) {
+        charts.anomaly = initAnomalyChart(document.getElementById('anomalyChart').getContext('2d'));
+    }
+
+    if (document.getElementById('wardChart')) {
+        charts.ward = initWardChart(document.getElementById('wardChart').getContext('2d'));
+    }
+
+    if (document.getElementById('forecastChart')) {
+        charts.forecast = initForecastChart(document.getElementById('forecastChart').getContext('2d'));
+    }
+
+    // Load Ward Data for sidebar chart
+    loadWardData();
+
+    // Connect WebSocket
+    connectWebSocket();
+
+    // Event Listeners
+    document.getElementById('scenario-leak').addEventListener('click', () => toggleScenario(true));
+    document.getElementById('scenario-normal').addEventListener('click', () => toggleScenario(false));
+
+    // Setup Navigation
+    setupNavigation();
+
+    // Start Clock
+    setInterval(updateClock, 1000);
+}
+
+async function loadWardData() {
+    try {
+        const response = await fetch('/api/data/wards');
+        const data = await response.json();
+        if (data.success && charts.ward) {
+            const labels = data.data.map(w => w.ward_name);
+            const values = data.data.map(w => w.avg_daily_consumption_m3);
+            charts.ward.data.labels = labels;
+            charts.ward.data.datasets[0].data = values;
+            charts.ward.update();
+        }
+    } catch (error) {
+        console.error("Failed to load ward data:", error);
+    }
+}
+
+function setupWardSelector() {
+    // If selector doesn't exist, create it in the header
+    let select = document.getElementById('ward-select');
+    if (!select) {
+        const header = document.querySelector('.header-right') || document.body;
+        select = document.createElement('select');
+        select.id = 'ward-select';
+        select.className = 'ward-selector';
+        [1, 2, 3, 4].forEach(i => {
+            const opt = document.createElement('option');
+            opt.value = i;
+            opt.innerText = `Ward ${i} (Tank-${String.fromCharCode(64 + i)})`;
+            select.appendChild(opt);
+        });
+        select.onchange = (e) => {
+            currentWard = parseInt(e.target.value);
+            updateDashboardView();
+        };
+        // Insert before profile or at end
+        const profile = document.querySelector('.profile-menu');
+        if (profile) profile.parentNode.insertBefore(select, profile);
+    }
+}
+
+// WebSocket Connection
+function connectWebSocket() {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    ws = new WebSocket(`${protocol}//${window.location.host}/api/simulation/ws`);
+
+    ws.onopen = () => {
+        console.log("Connected to Smart Grid Stream");
+        simulationActive = true;
+        // Auto-start simulation
+        fetch('/api/simulation/start', { method: 'POST' });
+    };
+
+    ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        if (data.wards) {
+            processMultiWardData(data);
+        }
+    };
+
+    ws.onclose = () => {
+        console.log("Stream Disconnected");
+        setTimeout(connectWebSocket, 3000); // Auto-reconnect
+    };
+}
+
+// Core Visualization Logic
+function processMultiWardData(rootData) {
+    const wardKey = `ward_${currentWard}`;
+    const wardData = rootData.wards[wardKey];
+
+    if (!wardData) return;
+
+    // 1. Update Metrics
+    updateMetrics(wardData);
+
+    // 2. Render Smart Grid (Pipes & Tank)
+    renderSmartGrid(wardData);
+
+    // 3. Handle Alerts
+    if (wardData.alerts && wardData.alerts.length > 0) {
+        showAlerts(wardData.alerts);
+    }
+
+    // 4. Update Charts
+    // Aggregate flow for chart
+    const totalFlow = wardData.pipes.reduce((sum, p) => sum + p.flow_rate, 0);
+
+    // Create a composite data object with leak_probability
+    const realTimeData = {
+        flow_rate: totalFlow,
+        leak_probability: wardData.leak_probability
+    };
+
+    updateRealTimeCharts(charts.flow, charts.anomaly, realTimeData);
+}
+
+function renderSmartGrid(wardData) {
+    // Get or Create Container
+    let container = document.getElementById('smart-grid-visual');
+    if (!container) {
+        // If specific container missing, look for simulation-view or create one
+        const parent = document.querySelector('.main-content');
+        container = document.createElement('div');
+        container.id = 'smart-grid-visual';
+        container.className = 'smart-grid-container';
+        // Insert at top of main content
+        parent.insertBefore(container, parent.firstChild);
+
+        // Add Styles dynamically
+        const style = document.createElement('style');
+        style.textContent = `
+            .smart-grid-container {
+                display: grid;
+                grid-template-columns: repeat(2, 1fr);
+                gap: 20px;
+                background: #1e293b;
+                padding: 20px;
+                border-radius: 15px;
+                margin-bottom: 20px;
+            }
+            .pipe-pair {
+                background: #0f172a;
+                padding: 15px;
+                border-radius: 10px;
+                border: 1px solid #334155;
+            }
+            .pipe {
+                display: flex;
+                align-items: center;
+                margin: 10px 0;
+                padding: 10px;
+                border-radius: 8px;
+                background: rgba(255,255,255,0.05);
+                transition: all 0.5s ease;
+                position: relative;
+            }
+            .pipe.active-primary { border: 2px solid #00f2ea; box-shadow: 0 0 15px rgba(0, 242, 234, 0.2); }
+            .pipe.active-backup { border: 2px solid #3b82f6; box-shadow: 0 0 15px rgba(59, 130, 246, 0.2); }
+            .pipe.leak { border: 2px solid #ff0055; animation: pulseRed 1s infinite; }
+            .pipe-icon { font-size: 24px; margin-right: 15px; }
+            .pipe-details { flex-grow: 1; }
+            .pipe-status { font-weight: bold; font-size: 0.8rem; text-transform: uppercase; float: right; }
+            
+            @keyframes pulseRed {
+                0% { box-shadow: 0 0 0 0 rgba(255, 0, 85, 0.4); }
+                70% { box-shadow: 0 0 0 10px rgba(255, 0, 85, 0); }
+                100% { box-shadow: 0 0 0 0 rgba(255, 0, 85, 0); }
+            }
+            
+            .tank-header {
+                grid-column: span 2;
+                text-align: center;
+                font-size: 1.2rem;
+                color: #94a3b8;
+                margin-bottom: 10px;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    // Render Pipes
+    const pipesHtml = wardData.pipes.map(pair => {
+        // Logic: Is this pair in Primary or Backup mode?
+        const isBackupActive = pair.active_pipe === pair.backup_pipe;
+        const isLeaking = pair.is_leaking;
+
+        return `
+            <div class="pipe-pair">
+                <h4 style="color:#94a3b8">Pipe Pair ${pair.pair_id}</h4>
+                
+                <!-- Primary Pipe -->
+                <div class="pipe ${!isBackupActive && !isLeaking ? 'active-primary' : ''} ${isLeaking ? 'leak' : ''}" style="opacity: ${isBackupActive ? 0.5 : 1}">
+                    <span class="pipe-icon">🟢</span>
+                    <div class="pipe-details">
+                        <div>Pipe-${pair.primary_pipe} (Primary)</div>
+                        <div style="font-size:0.8rem; color:#64748b">Flow: ${isBackupActive ? 0 : pair.flow_rate} L/min</div>
+                    </div>
+                    <span class="pipe-status" style="color: ${isLeaking ? '#ff0055' : '#00f2ea'}">
+                        ${isLeaking ? 'LEAK DETECTED' : (isBackupActive ? 'CLOSED' : 'ACTIVE')}
+                    </span>
+                </div>
+
+                <!-- Backup Pipe -->
+                <div class="pipe ${isBackupActive ? 'active-backup' : ''}" style="opacity: ${!isBackupActive ? 0.5 : 1}">
+                    <span class="pipe-icon">🔵</span>
+                    <div class="pipe-details">
+                        <div>Pipe-${pair.backup_pipe} (Backup)</div>
+                        <div style="font-size:0.8rem; color:#64748b">Flow: ${isBackupActive ? pair.flow_rate : 0} L/min</div>
+                    </div>
+                    <span class="pipe-status" style="color: ${isBackupActive ? '#3b82f6' : '#64748b'}">
+                        ${isBackupActive ? 'ACTIVE' : 'STANDBY'}
+                    </span>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    container.innerHTML = `
+        <div class="tank-header">MAIN TANK - WARD ${currentWard}</div>
+        ${pipesHtml}
+    `;
+}
+
+function showAlerts(alerts) {
+    const container = document.getElementById('alerts-list');
+    if (!container) return;
+
+    // Prepend new alerts
+    alerts.forEach(msg => {
+        const div = document.createElement('div');
+        div.className = 'alert-item new-alert';
+        div.innerHTML = `
+            <i data-lucide="alert-circle" style="color: var(--secondary)"></i>
+            <span>${msg}</span>
+            <span style="font-size: 0.7rem; margin-left: auto; opacity: 0.7">Just now</span>
+        `;
+        // Insert after header
+        container.insertBefore(div, container.firstChild);
+
+        // Remove 'new-alert' class after animation
+        setTimeout(() => div.classList.remove('new-alert'), 3000);
+    });
+
+    // Keep list clean (max 10)
+    while (container.children.length > 10) {
+        container.removeChild(container.lastChild);
+    }
+    if (window.lucide) lucide.createIcons();
+}
+
+function updateMetrics(wardData) {
+    if (!wardData || !wardData.pipes) return;
+
+    // Calculate aggregates from all pipes
+    const totalFlow = wardData.pipes.reduce((sum, p) => sum + p.flow_rate, 0);
+    const avgPressure = wardData.pipes.reduce((sum, p) => sum + p.pressure, 0) / wardData.pipes.length;
+    const leakProb = wardData.leak_probability || 0;
+
+    // Update KPI cards
+    const flowEl = document.getElementById('metric-flow');
+    const pressureEl = document.getElementById('metric-pressure');
+    const leakProbEl = document.getElementById('metric-leak-prob');
+    const consumptionEl = document.getElementById('metric-consumption');
+
+    if (flowEl) flowEl.textContent = totalFlow.toFixed(1);
+    if (pressureEl) pressureEl.textContent = avgPressure.toFixed(1);
+    if (leakProbEl) {
+        leakProbEl.textContent = leakProb.toFixed(1);
+        // Update progress bar if it exists
+        const progressBar = document.getElementById('leak-progress');
+        if (progressBar) {
+            progressBar.style.width = `${leakProb}%`;
+            progressBar.style.backgroundColor = leakProb > 50 ? '#ff0055' : '#00f2ea';
+        }
+    }
+    if (consumptionEl) {
+        // Estimate daily consumption from current flow (L/min -> m³/day)
+        const dailyEstimate = (totalFlow * 60 * 24) / 1000;
+        consumptionEl.textContent = dailyEstimate.toFixed(1);
+    }
+}
+
+async function toggleScenario(isLeak) {
+    await fetch('/api/simulation/scenario', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scenario: isLeak ? 'leak' : 'normal' })
+    });
+}
+
+// Start
+document.addEventListener('DOMContentLoaded', initApp);
+
+// --- HELPER FUNCTIONS ---
+
+function initFlowChart(ctx) {
+    return new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: Array(20).fill(''),
+            datasets: [{
+                label: 'Flow Rate (L/min)',
+                data: Array(20).fill(0),
+                borderColor: '#00f2ea',
+                backgroundColor: 'rgba(0, 242, 234, 0.1)',
+                tension: 0.4,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: { grid: { color: 'rgba(255, 255, 255, 0.1)' }, ticks: { color: '#94a3b8' } },
+                x: { grid: { display: false }, ticks: { display: false } }
+            },
+            plugins: { legend: { display: false } }
+        }
+    });
+}
+
+function initAnomalyChart(ctx) {
+    return new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: Array(20).fill(''),
+            datasets: [{
+                label: 'Anomaly Score',
+                data: Array(20).fill(0),
+                borderColor: '#ff0055',
+                borderDash: [5, 5],
+                tension: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: { max: 100, min: 0, grid: { color: 'rgba(255, 255, 255, 0.1)' } },
+                x: { display: false }
+            }
+        }
+    });
+}
+
+function initWardChart(ctx) {
+    return new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: [],
+            datasets: [{
+                label: 'Avg Consumption (m³)',
+                data: [],
+                backgroundColor: '#3b82f6',
+                borderRadius: 5
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: { grid: { color: 'rgba(255, 255, 255, 0.1)' } },
+                x: { grid: { display: false } }
+            }
+        }
+    });
+}
+
+function initForecastChart(ctx) {
+    return new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [
+                {
+                    label: 'Forecast',
+                    data: [],
+                    borderColor: '#00f2ea',
+                    tension: 0.4
+                },
+                {
+                    label: 'Upper Bound',
+                    data: [],
+                    borderColor: 'rgba(0, 242, 234, 0.3)',
+                    borderDash: [5, 5],
+                    fill: false,
+                    pointRadius: 0
+                },
+                {
+                    label: 'Lower Bound',
+                    data: [],
+                    borderColor: 'rgba(0, 242, 234, 0.3)',
+                    borderDash: [5, 5],
+                    fill: '-1',
+                    backgroundColor: 'rgba(0, 242, 234, 0.05)',
+                    pointRadius: 0
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false
+        }
+    });
+}
+
+function updateRealTimeCharts(chart, anomalyChart, data) {
+    if (!chart) return;
+
+    // Slide data window (keep last 20 points)
+    const labels = chart.data.labels;
+    const values = chart.data.datasets[0].data;
+
+    labels.push('');
+    labels.shift();
+
+    values.push(data.flow_rate);
+    values.shift();
+
+    chart.update('none');
+
+    if (anomalyChart && data.leak_probability !== undefined) {
+        const aValues = anomalyChart.data.datasets[0].data;
+        aValues.push(data.leak_probability);
+        aValues.shift();
+        anomalyChart.update('none');
+    }
+}
+
+// Navigation & View Switching
+function setupNavigation() {
+    const navItems = document.querySelectorAll('.nav-item');
+    navItems.forEach(item => {
+        item.addEventListener('click', (e) => {
+            e.preventDefault();
+            const target = item.dataset.page;
+            updateDashboardView(target);
+        });
+    });
+}
+
+function updateDashboardView(targetPage) {
+    if (targetPage) selectedView = targetPage;
+
+    // Update Nav Active State
+    document.querySelectorAll('.nav-item').forEach(nav => {
+        nav.classList.toggle('active', nav.dataset.page === selectedView);
+    });
+
+    // Show Target View
+    document.querySelectorAll('.page-view').forEach(view => {
+        view.classList.remove('active');
+        if (view.id === `view-${selectedView}`) {
+            view.classList.add('active');
+        }
+    });
+
+    // Update Header
+    const pageTitle = document.getElementById('page-title');
+    if (pageTitle) {
+        let title = 'Real-time Overview';
+        if (selectedView === 'insights') title = 'AI Insights';
+        if (selectedView === 'simulation') title = 'System Simulation';
+        if (selectedView === 'analytics') title = 'Advanced Analytics';
+        // Append Ward Info
+        title += ` - Ward ${currentWard}`;
+        pageTitle.textContent = title;
+    }
+
+    // Trigger resize for charts
+    Object.values(charts).forEach(c => c && c.resize());
+}
+
+function updateClock() {
+    const el = document.getElementById('current-time');
+    if (el) el.textContent = new Date().toLocaleTimeString();
+}

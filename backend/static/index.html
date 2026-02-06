@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FlowVision | Smart Water Management</title>
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+
+    <!-- Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- Charts -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- Styles -->
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+
+<body class="dark-theme">
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo-container">
+                <i data-lucide="droplets" class="logo-icon"></i>
+                <h1 class="logo-text">FlowVision</h1>
+            </div>
+
+            <nav class="nav-menu">
+                <a href="#" class="nav-item active" data-page="dashboard">
+                    <i data-lucide="layout-dashboard"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="#" class="nav-item" data-page="analytics">
+                    <i data-lucide="bar-chart-2"></i>
+                    <span>Analytics</span>
+                </a>
+                <a href="#" class="nav-item" data-page="simulation">
+                    <i data-lucide="activity"></i>
+                    <span>Simulation</span>
+                </a>
+                <a href="#" class="nav-item" data-page="insights">
+                    <i data-lucide="brain-circuit"></i>
+                    <span>AI Insights</span>
+                </a>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="status-indicator">
+                    <span class="status-dot online"></span>
+                    <span class="status-text">System Online</span>
+                </div>
+                <button id="theme-toggle" class="icon-button">
+                    <i data-lucide="sun"></i>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="top-header">
+                <div class="header-title">
+                    <h2 id="page-title">Real-time Overview</h2>
+                    <p id="page-subtitle">Monitoring water flow and leak detection across 12 wards</p>
+                </div>
+
+                <div class="header-actions">
+                    <div class="alert-badge" id="leak-alert" style="display: none;">
+                        <i data-lucide="alert-triangle"></i>
+                        <span>Leak Detected!</span>
+                    </div>
+                    <div class="time-display" id="current-time">--:--:--</div>
+                </div>
+            </header>
+
+            <!-- Dashboard View -->
+            <div id="view-dashboard" class="page-view active">
+                <!-- KPI Cards -->
+                <div class="kpi-grid">
+                    <div class="kpi-card">
+                        <div class="kpi-header">
+                            <span>Current Flow</span>
+                            <i data-lucide="waves" class="kpi-icon blue"></i>
+                        </div>
+                        <div class="kpi-value"><span id="metric-flow">--</span> <small>L/min</small></div>
+                        <div class="kpi-trend positive">
+                            <i data-lucide="arrow-up-right"></i>
+                            <span>Normal range</span>
+                        </div>
+                    </div>
+
+                    <div class="kpi-card">
+                        <div class="kpi-header">
+                            <span>Avg Pressure</span>
+                            <i data-lucide="gauge" class="kpi-icon purple"></i>
+                        </div>
+                        <div class="kpi-value"><span id="metric-pressure">--</span> <small>PSI</small></div>
+                        <div class="kpi-trend">
+                            <span>Stable</span>
+                        </div>
+                    </div>
+
+                    <div class="kpi-card">
+                        <div class="kpi-header">
+                            <span>Leak Probability</span>
+                            <i data-lucide="alert-circle" class="kpi-icon orange"></i>
+                        </div>
+                        <div class="kpi-value"><span id="metric-leak-prob">0</span> <small>%</small></div>
+                        <div class="progress-bar-container">
+                            <div class="progress-bar" id="leak-progress" style="width: 0%"></div>
+                        </div>
+                    </div>
+
+                    <div class="kpi-card">
+                        <div class="kpi-header">
+                            <span>Daily Consumption</span>
+                            <i data-lucide="droplet" class="kpi-icon cyan"></i>
+                        </div>
+                        <div class="kpi-value"><span id="metric-consumption">--</span> <small>m³</small></div>
+                        <div class="kpi-trend">
+                            <span>Forecast available</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Main Charts Row -->
+                <div class="charts-grid-2">
+                    <div class="chart-card">
+                        <div class="card-header">
+                            <h3>Live Flow Rate</h3>
+                            <div class="live-indicator">
+                                <span class="pulse"></span> LIVE
+                            </div>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="flowChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="chart-card">
+                        <div class="card-header">
+                            <h3>Anomaly Detection Score</h3>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="anomalyChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bottom Row -->
+                <div class="charts-grid-2">
+                    <div class="chart-card">
+                        <div class="card-header">
+                            <h3>Ward-wise Consumption</h3>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="wardChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="info-card">
+                        <div class="card-header">
+                            <h3>Recent Alerts</h3>
+                        </div>
+                        <div class="alerts-list" id="alerts-list">
+                            <!-- Populated by JS -->
+                            <div class="empty-state">No recent alerts</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Simulation View -->
+            <div id="view-simulation" class="page-view">
+                <div class="simulation-controls">
+                    <div class="control-card">
+                        <h3>Scenario Injection</h3>
+                        <p>Inject anomalies to test leak detection</p>
+
+                        <div class="toggle-group">
+                            <button class="btn-toggle active" id="scenario-normal" onclick="setScenario('normal')">
+                                Normal Operation
+                            </button>
+                            <button class="btn-toggle" id="scenario-leak" onclick="setScenario('leak')">
+                                Leak Scenario
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="chart-card full-width">
+                    <div class="card-header">
+                        <h3>Real-time Sensor Stream</h3>
+                    </div>
+                    <div class="chart-container large">
+                        <canvas id="simulationChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Analytics View -->
+            <div id="view-analytics" class="page-view">
+                <div class="chart-card full-width">
+                    <div class="card-header">
+                        <h3>Consumption Forecast (Next 24 Hours)</h3>
+                        <div class="actions">
+                            <span class="badge">AI Prediction</span>
+                        </div>
+                    </div>
+                    <div class="chart-container large">
+                        <canvas id="forecastChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Insights View -->
+            <div id="view-insights" class="page-view">
+                <div class="insights-container" id="insights-container">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- Scripts -->
+    <script src="/static/js/charts.js"></script>
+    <script src="/static/js/app.js"></script>
+    <script>
+        lucide.createIcons();
+    </script>
+</body>
+
+</html>

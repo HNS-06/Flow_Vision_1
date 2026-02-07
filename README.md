@@ -1,4 +1,8 @@
 # 💧 FlowVision 2.0 – Next-Gen Water Network Intelligence
+Team: Chakravyuha
+Members: Harinarayan S (Team Leader)
+         Bharath R
+Contact: 8590199082
 
 > **AI-Driven Water Management: Detect, Predict, Optimize.**
 

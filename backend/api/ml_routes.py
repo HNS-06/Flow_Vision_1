@@ -16,6 +16,7 @@ class LeakDetectionRequest(BaseModel):
 
 class ForecastRequest(BaseModel):
     steps: int = 24
+    ward_id: int = 1
 
 @router.post("/detect-leak")
 async def detect_leak(request: LeakDetectionRequest):
@@ -67,7 +68,7 @@ async def forecast_consumption(request: ForecastRequest):
             flow_data = data_service.flow_data
         
         # Generate forecast
-        summary = ml_service.forecast_consumption(flow_data, steps=request.steps)
+        summary = ml_service.forecast_consumption(flow_data, steps=request.steps, ward_id=request.ward_id)
         
         if summary is None:
             raise HTTPException(status_code=500, detail="Forecasting failed")
@@ -91,8 +92,37 @@ async def get_insights():
         return {
             "success": True,
             "insights": result['insights'],
-            "comparison": result['comparison']
+            "comparison": result['comparison'],
+            "clusters": result.get('clusters', {})
         }
     except Exception as e:
         print(f"Error in insights: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/optimize")
+async def optimize_distribution():
+    """Run optimization for water distribution"""
+    try:
+        result = ml_service.optimize_water_distribution()
+        if result is None:
+             raise HTTPException(status_code=500, detail="Optimization failed")
+        return {"success": True, "optimization": result}
+    except Exception as e:
+         raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/control/{ward_id}")
+async def get_control_action(ward_id: int):
+    """Get RL agent action for a ward"""
+    try:
+        # Mock inputs for now - in real world would come from sensors
+        import random
+        level = random.randint(30, 90)
+        demand = random.randint(100, 300)
+        hour = 12
+        
+        action = ml_service.get_rl_control_action(ward_id, level, demand, hour)
+        if action is None:
+             raise HTTPException(status_code=500, detail="Control action failed")
+        return {"success": True, "action": action, "state": {"level": level, "demand": demand}}
+    except Exception as e:
+         raise HTTPException(status_code=500, detail=str(e))

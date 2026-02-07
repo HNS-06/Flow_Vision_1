@@ -9,3 +9,5 @@ websockets
 sqlalchemy
 pydantic
 python-dotenv
+xgboost
+pulp

@@ -4,7 +4,8 @@
  */
 
 // Configuration
-const API_BASE_URL = 'http://10.156.244.94:8000';
+// Configuration
+const API_BASE_URL = `http://${window.location.hostname}:8000`;
 
 // State
 let ws = null;
@@ -100,7 +101,7 @@ async function loadForecastData() {
         const response = await fetch(`${API_BASE_URL}/api/ml/forecast`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ steps: 24 })
+            body: JSON.stringify({ steps: 24, ward_id: currentWard })
         });
         const data = await response.json();
         if (data.success && charts.forecast && data.forecast) {
@@ -233,7 +234,6 @@ function setupWardSelector() {
             console.log(`Switched to Ward ${currentWard}`);
 
             // Update all headings with the new ward number
-            const headingTitle = document.querySelector('.header-title h2');
             if (headingTitle) {
                 // Update main heading based on current view
                 const activeView = document.querySelector('.page-view.active');
@@ -246,6 +246,10 @@ function setupWardSelector() {
                     }
                 }
             }
+
+            // Reload Data
+            loadForecastData();
+            loadInsightsData();
         });
     }
 }
@@ -288,7 +292,7 @@ async function stopSimulation() {
 // WebSocket Connection
 function connectWebSocket() {
     // Connect to backend IP directly
-    ws = new WebSocket(`ws://10.156.244.94:8000/api/simulation/ws`);
+    ws = new WebSocket(`ws://${window.location.hostname}:8000/api/simulation/ws`);
 
     ws.onopen = () => {
         console.log("WebSocket connected");

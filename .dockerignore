@@ -1,0 +1,21 @@
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.env
+.venv
+env.bak
+venv.bak
+.git/
+.gitignore
+.dockerignore
+Dockerfile
+*.log
+data/raw/*
+data/processed/*
+data/database/*
+# We ignore generated data because we generate it during build
+# However, if you want faster builds and data is static, comment the data/* lines and COPY it.

@@ -72,9 +72,23 @@ class SmartPipeSystem:
             })
         
         # Calculate Ward aggregate metrics for Anomaly Score
-        # If any pipe is leaking, high probability (80-99), else low (0-10)
         any_leak = any(p['is_leaking'] for p in ward_data['pipes'])
-        ward_data['leak_probability'] = random.uniform(85, 99) if any_leak else random.uniform(0, 5)
+        
+        if any_leak:
+            ward_data['leak_probability'] = random.uniform(85, 99)
+            # Re-broadcast critical alert occasionally
+            if random.random() < 0.3:
+                ward_data['alerts'].append(f"CRITICAL: Active leak in Ward-{self.ward_id} - Maintenance Required")
+        else:
+            # More variation in normal score (variable between 2-18%)
+            base_noise = random.normalvariate(8, 3) 
+            ward_data['leak_probability'] = max(2, min(25, base_noise))
+            
+            # Generate minor warnings if score is elevated
+            if ward_data['leak_probability'] > 12 and random.random() < 0.15:
+                 ward_data['alerts'].append(f"Warning: Minor pressure instability detected in Ward-{self.ward_id}")
+            elif random.random() < 0.05:
+                 ward_data['alerts'].append(f"Info: Routine check - Ward-{self.ward_id} nominal")
 
         return ward_data
 

@@ -3,12 +3,16 @@
  * Complete implementation with all views and real-time data
  */
 
+// Configuration
+const API_BASE_URL = 'http://10.156.244.94:8000';
+
 // State
 let ws = null;
 let currentWard = 1;
 let selectedView = 'dashboard';
 let simulationActive = false;
 let charts = {};
+
 
 // DOM Elements
 const elements = {
@@ -75,7 +79,7 @@ async function initApp() {
 // Load Ward-wise Consumption Data
 async function loadWardData() {
     try {
-        const response = await fetch('/api/data/wards');
+        const response = await fetch(`${API_BASE_URL}/api/data/wards`);
         const data = await response.json();
         if (data.success && charts.ward) {
             const labels = data.data.map(w => w.ward_name);
@@ -93,7 +97,7 @@ async function loadWardData() {
 // Load Forecast Data
 async function loadForecastData() {
     try {
-        const response = await fetch('/api/ml/forecast', {
+        const response = await fetch(`${API_BASE_URL}/api/ml/forecast`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ steps: 24 })
@@ -120,7 +124,7 @@ async function loadForecastData() {
 // Load AI Insights
 async function loadInsightsData() {
     try {
-        const response = await fetch('/api/ml/insights');
+        const response = await fetch(`${API_BASE_URL}/api/ml/insights`);
         const data = await response.json();
         if (data.success && data.insights) {
             renderInsights(data.insights);
@@ -257,7 +261,7 @@ function updateSimulationStatus(status) {
 
 async function startSimulation() {
     try {
-        const response = await fetch('/api/simulation/start', { method: 'POST' });
+        const response = await fetch(`${API_BASE_URL}/api/simulation/start`, { method: 'POST' });
         if (response.ok) {
             simulationActive = true;
             updateSimulationStatus('RUNNING');
@@ -270,7 +274,7 @@ async function startSimulation() {
 
 async function stopSimulation() {
     try {
-        const response = await fetch('/api/simulation/stop', { method: 'POST' });
+        const response = await fetch(`${API_BASE_URL}/api/simulation/stop`, { method: 'POST' });
         if (response.ok) {
             simulationActive = false;
             updateSimulationStatus('STOPPED');
@@ -283,15 +287,15 @@ async function stopSimulation() {
 
 // WebSocket Connection
 function connectWebSocket() {
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    ws = new WebSocket(`${protocol}//${window.location.host}/api/simulation/ws`);
+    // Connect to backend IP directly
+    ws = new WebSocket(`ws://10.156.244.94:8000/api/simulation/ws`);
 
     ws.onopen = () => {
         console.log("WebSocket connected");
         simulationActive = true; // Auto-start to show data immediately
         updateSimulationStatus('RUNNING');
         // Start simulation automatically
-        fetch('/api/simulation/start', { method: 'POST' })
+        fetch(`${API_BASE_URL}/api/simulation/start`, { method: 'POST' })
             .then(() => console.log('Simulation auto-started'))
             .catch(err => console.error('Failed to auto-start:', err));
     };
@@ -456,7 +460,7 @@ function updateMetrics(wardData) {
 // Toggle Scenario
 async function toggleScenario(isLeak) {
     try {
-        await fetch('/api/simulation/scenario', {
+        await fetch(`${API_BASE_URL}/api/simulation/scenario`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ leak: isLeak })

@@ -1,0 +1,9 @@
+{
+  "appId": "com.flowvision.app",
+  "appName": "FlowVision",
+  "webDir": "backend/static",
+  "server": {
+    "cleartext": true,
+    "androidScheme": "http"
+  }
+}

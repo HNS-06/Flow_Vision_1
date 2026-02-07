@@ -28,11 +28,7 @@ API_RELOAD = os.getenv('API_RELOAD', 'True').lower() == 'true'
 DATABASE_URL = f"sqlite:///{DATABASE_DIR / 'flowvision.db'}"
 
 # CORS
-CORS_ORIGINS = [
-    "http://localhost:3000",
-    "http://localhost:5173",
-    "http://localhost:8080",
-]
+CORS_ORIGINS = ["*"]
 
 # Simulation settings
 SIMULATION_INTERVAL = 1.0  # seconds between updates

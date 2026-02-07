@@ -44,6 +44,10 @@ if not os.path.exists(static_dir):
     os.makedirs(static_dir)
 
 app.mount("/static", StaticFiles(directory=static_dir), name="static")
+app.mount("/css", StaticFiles(directory=os.path.join(static_dir, "css")), name="css")
+app.mount("/js", StaticFiles(directory=os.path.join(static_dir, "js")), name="js")
+if os.path.exists(os.path.join(static_dir, "img")):
+    app.mount("/img", StaticFiles(directory=os.path.join(static_dir, "img")), name="img")
 
 @app.get("/")
 async def read_index():

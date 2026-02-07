@@ -1,65 +1,98 @@
-<<<<<<< HEAD
-# Flow_Vision_1
-=======
-# FlowVision Setup & Run Guide
+# 💧 FlowVision 2.0 – Smart Water Network Intelligence
 
-## Prerequisites
+![FlowVision Dashboard](https://via.placeholder.com/1200x600?text=FlowVision+Dashboard+Mockup)
+
+**FlowVision** is an advanced AI-powered water management system designed to detect leaks, predict consumption, and visualize network health in real-time. It seamlessly integrates a high-performance **FastAPI backend** with a responsive **Web Dashboard** and a native **Android Mobile App**.
+
+---
+
+## 🚀 The "Secret Sauce"
+
+What makes FlowVision unique?
+
+### 1. 🧠 AI-Driven Anomaly Detection (Isolation Forest)
+We don't just use simple thresholds. FlowVision employs an unsupervised **Isolation Forest** model that learns "normal" flow patterns over time. It can detect subtle deviations—like a slowly growing leak—that traditional rule-based systems miss.
+- **Model:** `sklearn.ensemble.IsolationForest`
+- **Logic:** `ml_pipeline/leak_detection.py`
+
+### 2. 🔮 Predictive Forecasting (Linear Regression + Feature Engineering)
+FlowVision predicts water demand for the next 24 hours with high accuracy.
+- **Engineered Features:** Uses lag features (t-1h, t-24h), rolling averages, and cyclical time encoding (sin/cos of hour).
+- **Benefit:** Helps utilities optimize pressure and reduce energy costs.
+
+### 3. ⚡ Real-Time WebSocket Streaming
+No manual refreshing. The backend streams sensor data (flow rate, pressure, leak probability) to both the Web Dashboard and Android App instantly via **WebSockets**.
+- **Latency:** < 50ms updates.
+
+### 4. 📱 Unified Cross-Platform Experience (Capacitor)
+One codebase, everywhere. The frontend is built with vanilla HTML/JS for maximum performance and wrapped with **Capacitor** to run natively on Android.
+- **Web:** Accessible via browser.
+- **Mobile:** Installed as a native Android APK.
+
+---
+
+## 🛠️ Tech Stack
+
+- **Backend:** Python, FastAPI, Uvicorn, WebSockets.
+- **Frontend:** Vanilla JS, Chart.js, Lucide Icons, CSS Variables (Dark Mode).
+- **Mobile:** Capacitor, Android Studio (Gradle).
+- **ML/AI:** Scikit-learn, Pandas, NumPy.
+- **Data:** Synthetic data generation engine simulating realistic hydraulic behaviors.
+
+---
+
+## ⚡ Quick Start
+
+### Prerequisites
 - Python 3.9+
-- Pip (Python Package Manager)
+- Node.js & npm (for Mobile App build only)
 
-## Installation
+### 1. Installation
+```bash
+pip install -r requirements.txt
+```
 
-1. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-## Running the Application
-
-Simply double-click `run_flowvision.bat` or run:
-
+### 2. Run Everything (One-Click)
+Double-click `run_flowvision.bat` or run:
 ```bash
 run_flowvision.bat
 ```
+This script will:
+- Generate synthetic data.
+- Train AI models.
+- Start the server at `http://localhost:8000`.
 
-This script will automatically:
-1. Generate synthetic water sensor data
-2. Train the ML models (Leak Detection & Forecasting)
-3. Start the FastAPI backend server
-4. Serve the Dashboard at `http://localhost:8000`
+### 3. Mobile App (Android)
+To run the Android app continuously (requires Android device connected via USB):
+```bash
+npx cap run android
+```
 
-## Manual Execution
+---
 
-If you prefer to run steps manually:
+## 📂 Project Structure
 
-1. **Generate Data:**
-   ```bash
-   python scripts/generate_sample_data.py
-   ```
+```
+flowvision2/
+├── backend/            # FastAPI App & Routes
+│   ├── app.py          # Main Server Entry
+│   ├── static/         # Web Frontend (HTML/JS/CSS)
+├── ml_pipeline/        # AI Models (Training & Inference)
+├── android/            # Native Android Project Source
+├── data/               # Datasets
+├── scripts/            # Utilities
+└── README.md           # This file
+```
 
-2. **Process Data & Train Models:**
-   ```bash
-   python ml_pipeline/data_preprocessing.py
-   python ml_pipeline/leak_detection.py
-   python ml_pipeline/consumption_forecast.py
-   ```
+---
 
-3. **Start Server:**
-   ```bash
-   python backend/app.py
-   ```
+## 🌟 Key Features
 
-## Project Structure
-- `backend/`: FastAPI application and API routes
-  - `backend/static/`: Zero-build Frontend (HTML/JS/CSS)
-- `ml_pipeline/`: Machine Learning models and logic
-- `data/`: Generated datasets (Raw & Processed)
-- `scripts/`: Utility scripts
+- **Live Flow Monitoring:** Visualize L/min flow rates in real-time.
+- **Leak Alerts:** Instant notifications when anomaly score > 75%.
+- **Scenario Injection:** Toggle "Simulate Leak" mode to demonstrate detection capabilities.
+- **Dark Mode UI:** Sleek, modern interface designed for control rooms.
 
-## Features
-- **Live Monitoring**: Real-time water flow visualization via WebSockets
-- **Leak Detection**: AI-powered anomaly detection using Isolation Forest
-- **Forecasting**: Next-24h consumption prediction
-- **Simulation**: Interactive "Leak Scenario" toggle for demo purposes
-- **[View Datasets & Models Documentation](DATA_AND_MODELS.md)**
->>>>>>> 1f4306b (FlowVision 2)
+---
+
+*Built for the Future of Water Management.*
